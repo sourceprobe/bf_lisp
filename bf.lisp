@@ -3,24 +3,25 @@
 ; return hash tables to find matching braces
 (defun build_jumps (program)
   ; first element of stack is top of stack
-  (defun build_jumps_inner (i stack forward backward)
-    (if (>= i (length program))
-      (if (eq '() stack)
-	(cons forward backward)
-	(error "jump stack not empty"))
-      (let ((c (char program i)))
-	(cond ((eq c #\[)
-	       (build_jumps_inner (+ 1 i) (cons i stack) forward backward))
-	      ((eq c #\])
-	       (let ((open (car stack))
-		     (close i)
-		     (stack (cdr stack)))
-		 (progn
-		   (setf (gethash open forward) close)
-		   (setf (gethash close backward) open)
-		   (build_jumps_inner (+ 1 i) stack forward backward))))
-	      (t (build_jumps_inner (+ 1 i) stack forward backward))))))
-  (build_jumps_inner 0 '() (make-hash-table) (make-hash-table)))
+  (let ((stack nil)
+	(forward (make-hash-table))
+	(backward (make-hash-table)))
+    (loop for i below (length program) 
+	  for c = (char program i)
+	  do (cond 
+	       ((eq c #\[) (setf stack (cons i stack)))
+	       ((eq c #\])
+	         (let ((open (car stack))
+	  	       (close i))
+	  	 (progn
+	  	   (setf stack (cdr stack))
+	  	   (setf (gethash open forward) close)
+	  	   (setf (gethash close backward) open)))))
+	  finally 
+	  	(return (if 
+		  (eq nil stack)
+		  (cons forward backward)
+		  (error "jump stack not empty"))))))
 (defun jump (table i)
   (if (gethash i table)
     (+ 1 (gethash i table))
