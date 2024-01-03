@@ -24,7 +24,7 @@
 		  (error "jump stack not empty"))))))
 (defun jump (table i)
   (if (gethash i table)
-    (+ 1 (gethash i table))
+    (gethash i table)
     (error "missing jump.")))
 
 (defun tape-inc (tape i)
@@ -36,39 +36,29 @@
     (error "negative index: " i)
     (setf (aref tape i) (rem (- (aref tape i) 1) 256))))
 
-
 (defun bf (program)
-  (defun bf_state (pc ptr tape forward backward)
-    (if (>= pc (length program))
-      "done"
-      (let ((c (char program pc))
-	    (next (+ 1 pc)))
-	(cond ((eq c #\+) (progn
-			     (tape-inc tape ptr)
-			     (bf_state next ptr tape forward backward)))
-	      ((eq c #\-) (progn
-			     (tape-dec tape ptr)
-			     (bf_state next ptr tape forward backward)))
-	      ((eq c #\>) (bf_state next (+ ptr 1) tape forward backward))
-	      ((eq c #\<) (bf_state next (- ptr 1) tape forward backward))
-	      ((eq c #\.) (progn
-			     (princ (code-char (aref tape ptr)))
-			     (bf_state next ptr tape forward backward)))
-	      ((eq c #\[) (bf_state
-			     (if (= 0 (aref tape ptr))
-			       (jump forward pc)
-			       next)
-			     ptr tape forward backward))
-	      ((eq c #\]) (bf_state
-			     (if (= 0 (aref tape ptr))
-			       next
-			       (jump backward pc))
-			     ptr tape forward backward))
-	      (t (error "unknown instruction" c))))))
-  (let ((jumps (build_jumps program)))
-    (bf_state 0 0 (make-array (list TAPE_LEN) :initial-element 0)
-	      (car jumps)
-	      (cdr jumps))))
+  (let* ((jumps (build_jumps program))
+	 (tape (make-array (list TAPE_LEN) :initial-element 0))
+	 (pc 0)
+	 (ptr 0)
+	 (forward (car jumps))
+	 (backward (cdr jumps)))
+    (loop while (< pc (length program))
+       do 
+        (let ((c (char program pc)))
+       	  (cond 
+	       ((eq c #\+) (tape-inc tape ptr))
+     	       ((eq c #\-) (tape-dec tape ptr))
+     	       ((eq c #\>) (setf ptr (+ ptr 1) ))
+     	       ((eq c #\<) (setf ptr (- ptr 1) ))
+     	       ((eq c #\.) (princ (code-char (aref tape ptr))))
+     	       ((eq c #\[) (if (= 0 (aref tape ptr))
+     	  		     (setf pc (jump forward pc))))
+     	       ((eq c #\]) (if (/= 0 (aref tape ptr))
+     	  		     (setf pc (jump backward pc))))
+     	       (t (error "unknown instruction" c))))
+          (setf pc (+ 1 pc))
+     	  finally (return "done"))))
 
 (defun is-comment? (line)
   (and (> (length line) 0)
@@ -92,4 +82,3 @@
     (bf program)))
 (defun main ()
 	(run_program (nth 1 sb-ext:*posix-argv*)))
-
